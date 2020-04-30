@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE)
 ```
 
-```{r, echo = FALSE}
+```{r Packages, echo = FALSE}
 #USGS
 library(dataRetrieval)
 
@@ -24,6 +24,13 @@ library(ggplot2)
 library(leaflet)
 library(dplyr)
 library(maps)
+library(lubridate)
+library(janitor)
+library(tsibble)
+library(snakecase)
+library(stringr)
+library(paletteer)
+library(feasts)
 ```
 
 
@@ -48,6 +55,61 @@ NWIS
 - whatNWISdata | NWIS data availability, including period of record and count
 - readNWISdata | NWIS data using user-specified queries
 
+```{r AR Graph Theme}
+
+theme_ar = function(base_size = 12, base_family = "Avenir") {
+  theme_grey(base_size = base_size, base_family = base_family) %+replace%
+    theme(
+      
+      # Specify axis options
+      axis.line = element_line(),  
+      axis.text.x = element_text(size = base_size*0.8, color = "black", lineheight = 0, angle = 45),  
+      axis.text.y = element_text(size = base_size*0.8, color = "black", lineheight = 0),  
+      #axis.ticks = element_line(color = "black", size  =  0.2),  
+      axis.title.x = element_text(size = base_size, color = "black", margin = margin(0, 10, 0, 0)),  
+      axis.title.y = element_text(size = base_size, face = "bold", color = "black", angle = 90, margin = margin(0, 10, 0, 0)),  
+      #axis.ticks.length = unit(0.3, "lines"), 
+      
+      # Specify legend options
+      legend.background = element_rect(color = "NA", fill = NA),  
+      legend.key = element_rect(color = NA,  fill = NA),  
+      #legend.key.size = unit(1.2, "lines"),  
+      legend.key.height = NULL,  
+      legend.key.width = NULL,      
+      legend.text = element_text(size = base_size*0.8, color = "black"),  
+      legend.title = element_text(size = base_size*0.8, face = "bold", hjust = 0, color = "black"),  
+      #legend.position = "bottom",  
+      legend.text.align = NULL,  
+      legend.title.align = NULL,  
+      #legend.direction = "horizontal",  
+      legend.box = NULL, 
+      
+      # Specify panel options
+      panel.background = element_rect(fill = NA, color  =  NA),  
+      panel.border = element_rect(fill = NA, color = NA),  
+      panel.grid.major = element_line(color = NA),  
+      panel.grid.minor = element_line(color = NA),  
+      panel.margin = unit(0, "lines"),   
+      
+      # Specify facetting options
+      strip.background = element_rect(fill = "grey30", color = "grey10"),  
+      strip.text.x = element_text(size = base_size*0.8, color = "black"),  
+      strip.text.y = element_text(size = base_size*0.8, color = "black",angle = -90),  
+      
+      # Specify plot options
+      plot.background = element_rect(color = NA, fill = NA),  
+      plot.title = element_text(size = base_size*1.2, color = "black", face = "bold", margin=margin(0,0,5,0)),  
+      plot.subtitle = element_text(size = base_size*0.9, color = "black"),
+      plot.margin = unit(rep(1, 4), "lines")
+    )
+}
+
+
+#View(palettes_c_names)
+#ggsave("your_title.pdf", device=cairo_pdf, width = 6, height = 6)
+```
+
+
 
 ```{r Upper San Juan USGS AVAILABLE, echo = FALSE }
 
@@ -69,9 +131,7 @@ comment(sj_available_data)
 
 #Exploring Discharge Specifically: 
 
-dis_codes <- parameterCdFile[grep("discharge",
-                                  parameterCdFile$parameter_nm,
-                                  ignore.case = TRUE),] 
+#dis_codes <- parameterCdFile[grep("discharge", parameterCdFile$parameter_nm, ignore.case = TRUE),] 
 #pulling all params that have to do with discharge
 
 nrow(dis_codes) #There are 24 different params for discharge
@@ -110,7 +170,9 @@ names(attributes(sj_pagosa))
 url <- attr(sj_pagosa, "url")
 
 #Site info
-sjp_site <- attr(sj_pagosa, "siteInfo")
+sjp_site <- attr(sj_pagosa, "siteInfo") %>% 
+  mutate(station_nm = str_to_title(station_nm))
+  
 #Parameter info
 sjp_parameter <- attr(sj_pagosa, "variableInfo")
 
@@ -132,26 +194,84 @@ sjp_dis_join <- full_join(sjp_site, sj_pagosa, by = "site_no") %>%
          huc = hucCd, 
          dateTime = dateTime, 
          Flow_Inst = Flow_Inst, 
-        Flow_Inst_cd = Flow_Inst_cd)
+        Flow_Inst_cd = Flow_Inst_cd) %>% 
+  mutate(date = as.Date.POSIXct(dateTime)) %>% #need to seperate date from time, so can find average daily cfs, and plot that
+  mutate(year_month = yearmonth(date)) %>%  
+  mutate(month = month(date)) %>% 
+  group_by(year_month) %>% 
+  mutate(average_month_dis = mean(Flow_Inst)) %>% 
+  mutate(average_month_dis = round(average_month_dis, 0)) %>% 
+  distinct(year_month, .keep_all = TRUE) %>% 
+  select(-dateTime, -Flow_Inst)
 
 head(sjp_dis_join)
 
+```
+
+```{r Upper San Juan USGS GRAPH, echo = FALSE}
 
 #Basic graph to get a sense for things: 
 
 sjp_dis_graph <- ggplot(data = sjp_dis_join,
-                        aes(dateTime, 
-                            Flow_Inst)) +
+                        aes(date, 
+                            average_month_dis)) +
   geom_line() +
+  theme_ar() +
   xlab("") +
   ylab(sjp_parameter$variableDescription) +
   ggtitle(sjp_site$station_nm) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y",
+               expand = expansion()
+               ) +
+  labs(caption = "\nAverage monthly streamflow in the Upper San Juan River near Pagosa Springs, CO from 2009 - 2019.")
   
-  theme_classic() 
   
-
 sjp_dis_graph
+
 ```
+
+```{r Upper San Juan USGS SEASON GRAPH, echo = FALSE}
+
+# Coerce to a tsibble:
+sjp_auto <- as_tsibble(sjp_dis_join, index = year_month) %>% 
+  tsibble::fill_gaps()
+
+sjp_seasonal <- sjp_auto %>% 
+  feasts::gg_season(average_month_dis) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_date(date_breaks = "1 month",
+               date_labels = "%b", #codes from abrivs https://rdrr.io/r/base/strptime.html
+               expand = expansion()
+               ) +
+  xlab("\nMonth") +
+  ylab("Average Monthly Streamflow (cfs)") +
+  labs(title = "Seasonal Streamflow at Upper San Juan",
+       subtitle = "USGS Guage at Pagosa Springs, CO (2009 - 2019)\n") +
+  theme(plot.title = element_text(vjust = 0.5)) +
+  theme_ar()
+
+sjp_seasonal
+```
+
+
+```{r Upper San Juan USGS MONTH GRAPH, echo = FALSE}
+
+sjp_subseries <- sjp_auto %>% #Great graphical exploration, provides mean for each month across all months. 
+  feasts::gg_subseries(average_month_dis) +
+  xlab("\nMonth") +
+  ylab("Average Streamflow (cfs)\n") +
+  ggtitle("Average Streamflow Across all Years (2009 - 2019)\n") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.ticks.x = element_blank(),
+        panel.grid = element_blank())+
+  scale_x_date(date_breaks = "120 months",
+               date_labels = "%M")
+
+sjp_subseries
+```
+
 
 ```{r Upper San Juan USGS PULL ALL GUAGE, echo = FALSE }
 sj_dis_sites <- 
