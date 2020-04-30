@@ -1,0 +1,233 @@
+---
+title: "dataRetrieval_samples"
+author: "Lydia Bleifuss"
+date: "4/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###**Information:** 
+
+Complete documentation: 
+https://cran.r-project.org/web/packages/dataRetrieval/dataRetrieval.pdf
+
+Full run through (March 2020): https://cran.r-project.org/web/packages/dataRetrieval/vignettes/dataRetrieval.html
+
+Getting started: 
+https://cran.r-project.org/web/packages/dataRetrieval/vignettes/dataRetrieval.html#getting-started-in-r
+
+Type vignette("dataRetrieval") into RStudio Console to pull up the above links w/in RStudio 
+
+###**General Purpose:** 
+
+"The dataRetrieval package was created to simplify the process of loading hydrologic data into the R environment. It is designed to retrieve the major data types of U.S. Geological Survey (USGS) hydrologic data that are available on the Web, as well as data from the Water Quality Portal (WQP), which currently houses water quality data from the Environmental Protection Agency (EPA), U.S. Department of Agriculture (USDA), and USGS. Direct USGS data is obtained from a service called the National Water Information System (NWIS)."
+
+```{r}
+library(dataRetrieval)
+
+#Other 
+
+library(tidyverse)
+library(ggplot2)
+library(leaflet)
+library(dplyr)
+
+```
+
+###**TIPS:** 
+
+Type ?readNWISpCode in the Console and USGS Parameteer Data REtrieval informaiton will populate in the Help window. 
+
+Site Ids: "Often (but not always), USGS ID’s are 8 digits for surface-water sites and 15 digits for groundwater sites. The first step to finding data is discovering this siteNumber. There are many ways to do this, one is the National Water Information System: Mapper"
+
+https://maps.waterdata.usgs.gov/mapper/index.html
+
+RENAME columns with specific renameNWISColumns funtion after pulling in data and creating a dataframe: 
+
+df <- renameNWISColumns(df)
+
+You can add a WATER YEAR COLUMN:
+addWaterYear(rawData)
+
+
+###**Functions/Data Types/Information Available**
+NWIS
+- readNWISdv | NWIS daily data
+- readNWISqw | 	NWIS water quality data
+- readNWISuv | NWIS instantaneous value data
+- readNWISrating | NWIS rating table for active streamgage
+- readNWISmeas | 	NWIS surface-water measurements
+- readNWISpeak | NWIS peak flow data
+- readNWISgwl | 	NWIS groundwater level measurements
+- readNWISuse | NWIS water use
+- readNWISstat | NWIS statistical service
+- readNWISpCode | NWIS parameter code information
+- readNWISsite | NWIS site information
+- whatNWISsites | NWIS site search using user-specified queries
+- whatNWISdata | NWIS data availability, including period of record and count
+- readNWISdata | NWIS data using user-specified queries
+
+WQP
+- readWQPdata | WQP data using user-specified queries
+- readWQPqw | WQP data
+- whatWQPsites | WQP site search using user-specified queries
+
+
+###**Basic Steps**
+1. Find Site ID(s) you are interested in (siteNumber)
+2. Determine which parameter code (pCode) is of interest
+
+###**Example Code**
+
+####Pulling site info:
+Site into is obtained from the USGS REST system: 
+https://waterservices.usgs.gov/rest/Site-Test-Tool.html
+
+```{r}
+siteNumbers <- c("01491000","01645000") #defining sites of interest
+
+siteINFO <- readNWISsite(siteNumbers) #pulling site into
+
+comment(siteINFO) #explains column names from the siteINFO pulled above
+
+dailyDataAvailable <- whatNWISdata(siteNumbers = siteNumbers, 
+                                   service="dv") #helpful if you are interesting in a certain subset of data contained at the site of interest, this example limits to daily data
+```
+
+whatNWISdata: "It is possible to limit the retrieval information to a subset of services. The possible choices for services are: “dv” (daily values), “uv”, or “iv” (unit values), “qw” (water-quality), “sv” (sites visits), “pk” (peak measurements), “gw” (groundwater levels), “ad” (sites included in USGS Annual Water Data Reports External Link), “aw” (sites monitored by the USGS Active Groundwater Level Network External Link), and “id” (historical instantaneous values)"
+
+####Pulling parameter info:
+Search params: https://nwis.waterdata.usgs.gov/usa/nwis/pmcodes
+
+Physical params: https://nwis.waterdata.usgs.gov/usa/nwis/pmcodes?radio_pm_search=param_group&pm_group=Physical&pm_search=&casrn_search=&srsname_search=&format=html_table&show=parameter_group_nm&show=parameter_nm&show=casrn&show=srsname&show=parameter_units
+
+Useful params: 
+
+- Depth to water level (ft bls) | 72019
+- Water level, depth below land surface, (meters) | 99019
+- Depth to water level, below land surface datum (LSD) (meters) | 30210
+
+
+- Discharge, mean daily (cfs) | 00060
+- Discharge, instantaneous (cfs) | 00061
+- Precipitation total (in) | 00045
+
+Stats codes: 
+https://help.waterdata.usgs.gov/code/stat_cd_nm_query?stat_nm_cd=%25&fmt=html
+
+Useful stats: 
+- Max | 00001
+- Min | 00002
+- Mean | 00003
+- Median | 00008
+
+```{r}
+# Using defaults:
+parameterCd <- "00618" 
+parameterINFO <- readNWISpCode(parameterCd)
+```
+
+
+####Pulling data from a single site (example 1):
+
+```{r}
+# Choptank River near Greensboro, MD
+siteNumber <- "01491000" 
+ChoptankInfo <- readNWISsite(siteNumber) #pulls in all site info including spatial (lat,long)
+parameterCd <- "00060"
+
+#Raw daily data:
+rawDailyData <- readNWISdv(siteNumber,
+                           parameterCd,
+                      "1980-01-01",
+                      "2010-01-01")
+
+# Sample data Nitrate:
+parameterCd <- "00618"
+
+qwData <- readNWISqw(siteNumber,
+                     parameterCd,
+                      "1980-01-01",
+                     "2010-01-01")
+
+pCode <- readNWISpCode(parameterCd) #pulls in p-code informaiton
+```
+
+####Pulling data from a single site (example 2):
+
+```{r}
+
+# Choptank River near Greensboro, MD:
+siteNumber <- "01491000"
+parameterCd <- "00060"  # discharge
+startDate <- "2009-10-01"  #can define start and end dates to use in different calls 
+endDate <- "2012-09-30" 
+
+yahara_discharge <- readNWISdv(siteNumber, #asking for daily data at this site
+                    parameterCd, #asking for discharge 
+                    startDate, #asking to start here
+                    endDate) #asking to end here 
+
+```
+
+####Graphing data from a single site (example 3a):
+
+```{r}
+#Windsor River Wisconsin! 
+
+siteNo <- "05427718"
+pCode <- "00060" #discharge
+start.date <- "2014-10-01"
+end.date <- "2015-09-30"
+
+yahara <- readNWISuv(siteNumbers = siteNo, #uv is calling for instantaneous data
+                     parameterCd = pCode,
+                     startDate = start.date,
+                     endDate = end.date)
+
+#IMPORTANT: 
+
+#Column names for discharge and discharge code are read in as "X_00060_00011"  and  "X_00060_00011_cd" 
+
+names(yahara)
+
+#To clean up these columns (should alwasy do this for consistency)
+
+yahara <- renameNWISColumns(yahara)
+names(yahara)
+
+#Now these columns are "Flow_Inst" and "Flow_Inst_cd" 
+
+
+#There are also several attributes attached to each dataframe you pull in, to access these: 
+
+names(attributes(yahara))
+
+#To access these attributes, such as the url to the well, see example below: 
+
+url <- attr(yahara, "url")
+```
+
+####Graphing data from a single site with Metadata attached! (example 3b):
+
+```{r}
+
+parameterInfo <- attr(yahara, "variableInfo")
+siteInfo <- attr(yahara, "siteInfo")
+
+yahara_graph <- ggplot(yahara, 
+                       aes(dateTime, Flow_Inst)) +
+  geom_line()
+
+yahara_graph <- yahara_graph +
+  xlab("") +
+  ylab(parameterInfo$parameter_desc) + #look at why y axis is not working
+  ggtitle(siteInfo$station_nm) 
+
+yahara_graph
+  
+
+```

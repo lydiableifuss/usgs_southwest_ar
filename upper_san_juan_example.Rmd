@@ -1,0 +1,58 @@
+---
+title: "upper_san_juan_example"
+author: "Lydia Bleifuss"
+date: "4/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dataRetrieval)
+
+#Other 
+library(tidyverse)
+library(ggplot2)
+library(leaflet)
+library(dplyr)
+```
+
+```{r Upper San Juan USGS PULL}
+
+```
+
+```{r Upper San Juan USGS GRAPH}
+
+```
+
+```{r Upper San Juan USGS MAP}
+
+```
+
+```{r Upper San Juan SNOTEL PULL}
+
+```
+
+```{r Upper San Juan SNOTEL GRAPH}
+
+```
+
+```{r Upper San Juan SNOTEL MAP}
+
+```
+
+```{r Upper San Juan STATS - DECOMP}
+#average snowpack year, deviation above and below? 
+
+```
+
+```{r Upper San Juan ALL MAP}
+
+```
+
+```{r Upper San Juan CSV Export}
+
+```
+
