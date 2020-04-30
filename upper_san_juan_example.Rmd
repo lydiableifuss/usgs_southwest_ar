@@ -1,54 +1,190 @@
 ---
-title: "upper_san_juan_example"
+title: "Upper San Juan USGS + SNOTEL Data Pull"
 author: "Lydia Bleifuss"
-date: "4/29/2020"
+date: "4/27/2020"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
 ```
 
-```{r}
+```{r, echo = FALSE}
+#USGS
 library(dataRetrieval)
+
+#SNOTEL
+#library()
 
 #Other 
 library(tidyverse)
 library(ggplot2)
 library(leaflet)
 library(dplyr)
+library(maps)
 ```
 
-```{r Upper San Juan USGS PULL}
+
+#####**HUC USGS locator map:** https://water.usgs.gov/wsc/map_index.html
+
+#####**HUC 8 Data Basin locator map:** https://databasin.org/maps/df7fa3b1a0cc4ee997a677a29b6e9523/active
+
+###**Functions/Data Types/Information Available**
+NWIS
+- readNWISdv | NWIS daily data
+- readNWISqw | 	NWIS water quality data
+- readNWISuv | NWIS instantaneous value data
+- readNWISrating | NWIS rating table for active streamgage
+- readNWISmeas | 	NWIS surface-water measurements
+- readNWISpeak | NWIS peak flow data
+- readNWISgwl | 	NWIS groundwater level measurements
+- readNWISuse | NWIS water use
+- readNWISstat | NWIS statistical service
+- readNWISpCode | NWIS parameter code information
+- readNWISsite | NWIS site information
+- whatNWISsites | NWIS site search using user-specified queries
+- whatNWISdata | NWIS data availability, including period of record and count
+- readNWISdata | NWIS data using user-specified queries
+
+
+```{r Upper San Juan USGS AVAILABLE, echo = FALSE }
+
+#Get to know what data is available in the watershed
+
+sj_available_data <- whatNWISdata(huc = '14080101') #HUC 8 for Upper San Juan 
+
+comment(sj_available_data) 
+#defines all column heading included in teh dataset 
+
+#Now if we want to specify search, specify by param in the watershed 
+
+#Search params: https://nwis.waterdata.usgs.gov/usa/nwis/pmcodes
+
+#Useful params: 
+# Discharge, mean daily (cfs) | 00060
+# Discharge, instantaneous (cfs) | 00061
+# Precipitation total (in) | 00045
+
+#Exploring Discharge Specifically: 
+
+dis_codes <- parameterCdFile[grep("discharge",
+                                  parameterCdFile$parameter_nm,
+                                  ignore.case = TRUE),] 
+#pulling all params that have to do with discharge
+
+nrow(dis_codes) #There are 24 different params for discharge
+unique(dis_codes$parameter_units) #what are the units? 
 
 ```
 
-```{r Upper San Juan USGS GRAPH}
+
+```{r Upper San Juan USGS PULL ONE GUAGE, echo = FALSE }
+#SAN JUAN RIVER AT PAGOSA SPRINGS, CO
+
+sjp_site_no <- "09342500"
+sjp_pcode <- "00060" #discharge
+sjp_start_date <- "2009-10-01"
+sjp_end_date <- "2019-09-30"
+
+sj_pagosa <- readNWISuv(siteNumbers = sjp_site_no, #uv is calling for instantaneous data
+                     parameterCd = sjp_pcode,
+                     startDate = sjp_start_date,
+                     endDate = sjp_end_date)
+
+#IMPORTANT: 
+#Column names for discharge and discharge code are read in as "X_00060_00011"  and  "X_00060_00011_cd" 
+names(sj_pagosa)
+
+#To clean up these columns (should alwasy do this for consistency)
+sj_pagosa <- renameNWISColumns(sj_pagosa)
+names(sj_pagosa)
+#Now these columns are "Flow_Inst" and "Flow_Inst_cd" 
+
+
+#There are also several attributes attached to each dataframe you pull in, to access these: 
+names(attributes(sj_pagosa))
+
+#To access these attributes, such as the url to the well, see example below: 
+url <- attr(sj_pagosa, "url")
+
+#Site info
+sjp_site <- attr(sj_pagosa, "siteInfo")
+#Parameter info
+sjp_parameter <- attr(sj_pagosa, "variableInfo")
+
+#Join site info with discharge data to create full tidy df
+
+sjp_dis_join <- full_join(sjp_site, sj_pagosa, by = "site_no") %>% 
+  select(station_nm, 
+         site_no, 
+         dec_lat_va, 
+         dec_lon_va, 
+         hucCd, 
+         dateTime, 
+         Flow_Inst, 
+         Flow_Inst_cd) %>% 
+  rename(station_nm = station_nm, 
+         site_no = site_no, 
+         latitude = dec_lat_va, 
+         longitude = dec_lon_va, 
+         huc = hucCd, 
+         dateTime = dateTime, 
+         Flow_Inst = Flow_Inst, 
+        Flow_Inst_cd = Flow_Inst_cd)
+
+head(sjp_dis_join)
+
+
+#Basic graph to get a sense for things: 
+
+sjp_dis_graph <- ggplot(data = sjp_dis_join,
+                        aes(dateTime, 
+                            Flow_Inst)) +
+  geom_line() +
+  xlab("") +
+  ylab(sjp_parameter$variableDescription) +
+  ggtitle(sjp_site$station_nm) +
+  
+  theme_classic() 
+  
+
+sjp_dis_graph
+```
+
+```{r Upper San Juan USGS PULL ALL GUAGE, echo = FALSE }
+sj_dis_sites <- 
+```
+
+```{r Upper San Juan USGS GRAPH, echo = FALSE }
 
 ```
 
-```{r Upper San Juan USGS MAP}
+```{r Upper San Juan USGS MAP, echo = FALSE }
 
 ```
 
-```{r Upper San Juan SNOTEL PULL}
+```{r Upper San Juan SNOTEL PULL, echo = FALSE }
 
 ```
 
-```{r Upper San Juan SNOTEL GRAPH}
+```{r Upper San Juan SNOTEL GRAPH, echo = FALSE }
 
 ```
 
-```{r Upper San Juan SNOTEL MAP}
+```{r Upper San Juan SNOTEL MAP, echo = FALSE }
 
 ```
 
-```{r Upper San Juan STATS - DECOMP}
+```{r Upper San Juan STATS - DECOMP, echo = FALSE }
 #average snowpack year, deviation above and below? 
 
+#USGS Stats Code: https://help.waterdata.usgs.gov/code/stat_cd_nm_query?stat_nm_cd=%25&fmt=html
+
 ```
 
-```{r Upper San Juan ALL MAP}
+```{r Upper San Juan ALL MAP, echo = FALSE }
 
 ```
 
