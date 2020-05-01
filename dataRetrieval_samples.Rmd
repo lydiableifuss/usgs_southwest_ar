@@ -8,7 +8,6 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 ###**Information:** 
 
 Complete documentation: 
@@ -231,3 +230,163 @@ yahara_graph
   
 
 ```
+###Pulling in date by "box" or lat long coordinates:
+```{r}
+
+bBoxEx <- readNWISdata(bBox=c(-83,36.5,-81,38.5), parameterCd="00010") #temp data 
+
+bBoxEx <- renameNWISColumns(bBoxEx)
+names(bBoxEx)
+
+```
+
+
+```{r}
+
+dtw_pCode <- c("72019") #groundwater levels, depth to water (lev_va is the column heading)
+dtw_parameterINFO <- readNWISpCode(dtw_pCode)
+
+
+wy_sites <- readNWISdata(stateCd="WY", 
+                         service="site",
+                         seriesCatalogOutput=TRUE) %>% #include this to include parm_cd
+  filter(parm_cd == dtw_pCode) #%>% 
+  #renameNWISColumns() %>% 
+ # select(agency_cd, )
+  
+
+wy_dtw <- readNWISdata(stateCd="WY", service="gwlevels") %>% 
+  renameNWISColumns() %>% 
+  select(agency_cd, site_no, lev_dt, lev_va)
+
+
+wy_all_new <- merge(wy_dtw, wy_sites, by = "site_no")
+
+#length(unique(wy_dtw$site_no))
+```
+
+
+####Pulling groundwater levels:
+https://cran.r-project.org/web/packages/dataRetrieval/vignettes/dataRetrieval.html#groundwater-level-data
+
+Use function readNWISgwl or readNWISdata with "gwlevels" service to pull full state
+
+**Note cannot use readNWISsites w/ state code, need to specify sites wiht that, instead use readNWISdata and specify that the serviec is "site"
+
+```{r}
+#Option, by site:  
+siteNumber <- "311959110372001"
+groundWater <- readNWISgwl(siteNumber)
+
+#Option 2, by state: 
+azGWL <- readNWISdata(stateCd="AZ", service="gwlevels") #read in gwlevels for AZ (cannot read in entire state using readNWISgwl)
+
+azGWL <- renameNWISColumns(azGWL)
+names(azGWL)
+
+
+azGWsites <- azGWL %>% 
+  drop_na(lev_va) %>% 
+  distinct(site_no, .keep_all = TRUE) %>% 
+  readNWISsite(siteNumbers = azGWL$site_no)
+
+az_all <- inner_join(azGWL, azGWsites, by = "site_no")
+
+
+```
+Error: 
+azGWsites <- readNWISsite(siteNumbers = azGWL$site_no) 
+Request failed [400]. Retrying in 1 seconds...
+Request failed [400]. Retrying in 1 seconds...
+Error in getWebServiceData(obs_url, encoding = "gzip") : 
+  HTTP Status 400 - Input list size exceeded [keyword=[site], max-list-size=[35000]]
+  
+
+"35,000 limit on records retrieved from NWISWeb
+Currently NWISWeb has imposed an internal limit of 35,000 limit on records returned for one instance of a query.   We recently increased the limit from 20,000 to 35,000 and will continue to consider increasing the limit. In the meantime, if you are having difficulties acquiring all the data in a large request, we suggest one solution is to start at the inventory pages for the individual states and try pulling by county. For example, the inventory page for Texas is:
+http://waterdata.usgs.gov/tx/nwis/inventory
+
+where tx can be replaced by the two-letter postal code of the state of interest. By selecting a limited number of the counties, the number of records retrieved should be under the record limit.""
+
+
+####Pulling groundwater levels from National Ground Water Monitoring Network specifically! Basically vetted wells: 
+https://cida.usgs.gov/ngwmn/
+
+The National Ground-Water Monitoring Network (NGWMN) started as a product of the Subcommittee  on Ground Water  of the Federal Advisory Committee on Water Information (ACWI). The  NGWMN is a compilation of selected groundwater monitoring wells from Federal, State, and  local groundwater monitoring networks across the nation.
+
+The NGWMN Data Portal (https://cida.usgs.gov/ngwmn/index.jsp) provides access to groundwater data from multiple, dispersed  databases in a web-based mapping application. The portal contains current and historical data  including water levels, water quality, lithology, and well construction. The NGWMN is currently  in the process of adding new data providers to the Network. Agencies or organizations collecting  groundwater data can find out more about becoming a data provider for the Network (https://cida.usgs.gov/ngwmn/learnmore.jsp#getInvolved).
+
+Funding to support data providers to the National Ground-Water Monitoring Network is  provided through  USGS Cooperative Agreements. Agencies can also find  information about the status of the  USGS cooperative agreements (https://cida.usgs.gov/ngwmn/cooperativeagreements.jsp).
+
+2019! 
+https://cida.usgs.gov/ngwmn/doc/NGWMN_FY19_ProjectSummary.pdf
+
+```{r}
+#readNGWMNlevels(siteNumbers, asDateTime = TRUE, tz = "UTC")
+
+#"DISCLAIMER: NGWMN retrieval functions are still in flux, and no future behavior or output is guaranteed" - this is likely refering to the fact that NGWMN needs to be updated each year based on contracted state agencies 
+
+#one site
+site <- "USGS.430427089284901"
+oneSite <- readNGWMNlevels(siteNumbers = site)
+
+#multiple sites
+sites <- c("USGS:272838082142201","USGS:404159100494601", "USGS:401216080362703")
+multiSiteData <- readNGWMNlevels(sites)
+
+#non-USGS site
+site <- "MBMG.103306"
+#data <- readNGWMNlevels(siteNumbers = site, asDateTime = FALSE)
+
+```
+
+
+###Pulling in all discharge data by state:
+
+```{r}
+dailyWV <- readNWISdata(stateCd = "West Virginia", parameterCd = "00060") #discharge, cfs, daily mean
+
+dailyWV <- renameNWISColumns(dailyWV)
+names(dailyWV)
+```
+
+###Bring in with HUC number
+```{r}
+# Major filter: HUC 8 for Maui, 20020000
+# Service: daily value, dv
+# Statistic: minimum, 00002
+# Parameter code: water temperature in deg C, 00010
+
+MauiHUC8_mindailyT <- readNWISdata(huc="20020000", service="dv", statCd="00002", parameterCd="00010")
+head(MauiHUC8_mindailyT)
+```
+
+
+###AMAZING EXAMPLE WITH MAP!!!
+
+
+###Pulling in phosphorous data in Wisconsin:
+```{r}
+pCode <- c("00662","00665")
+phWI <- readNWISdata(stateCd="WI", service="site",
+                     seriesCatalogOutput=TRUE)
+
+phWI.1 <- filter(phWI, parm_cd %in% pCode) %>%
+            filter(count_nu > 300) %>%
+            mutate(period = as.Date(end_date) - as.Date(begin_date)) %>%
+            filter(period > 15*365)
+```
+
+
+```{r}
+library(leaflet)
+leaflet(data=phWI.1) %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  addCircleMarkers(~dec_long_va,~dec_lat_va,
+                   color = "red", radius=3, stroke=FALSE,
+                   fillOpacity = 0.8, opacity = 0.8,
+                   popup=~station_nm)
+```
+
+
+

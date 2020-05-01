@@ -31,6 +31,15 @@ library(snakecase)
 library(stringr)
 library(paletteer)
 library(feasts)
+library(sbtools) # to pull HUCS?
+library(sf)
+library(ggmap)
+library(tmap)
+library(rgdal)
+
+#Spatial Clipping 
+library(USAboundaries) # Download shape files
+library(USAboundariesData)
 ```
 
 
@@ -38,24 +47,30 @@ library(feasts)
 
 #####**HUC 8 Data Basin locator map:** https://databasin.org/maps/df7fa3b1a0cc4ee997a677a29b6e9523/active
 
-###**Functions/Data Types/Information Available**
-NWIS
-- readNWISdv | NWIS daily data
-- readNWISqw | 	NWIS water quality data
-- readNWISuv | NWIS instantaneous value data
-- readNWISrating | NWIS rating table for active streamgage
-- readNWISmeas | 	NWIS surface-water measurements
-- readNWISpeak | NWIS peak flow data
-- readNWISgwl | 	NWIS groundwater level measurements
-- readNWISuse | NWIS water use
-- readNWISstat | NWIS statistical service
-- readNWISpCode | NWIS parameter code information
-- readNWISsite | NWIS site information
-- whatNWISsites | NWIS site search using user-specified queries
-- whatNWISdata | NWIS data availability, including period of record and count
-- readNWISdata | NWIS data using user-specified queries
 
-```{r AR Graph Theme}
+```{r, echo = FALSE}
+###**Functions/Data Types/Information Available**
+
+# NWIS
+# - readNWISdv | NWIS daily data
+# - readNWISqw | 	NWIS water quality data
+# - readNWISuv | NWIS instantaneous value data
+# - readNWISrating | NWIS rating table for active streamgage
+# - readNWISmeas | 	NWIS surface-water measurements
+# - readNWISpeak | NWIS peak flow data
+# - readNWISgwl | 	NWIS groundwater level measurements
+# - readNWISuse | NWIS water use
+# - readNWISstat | NWIS statistical service
+# - readNWISpCode | NWIS parameter code information
+# - readNWISsite | NWIS site information
+# - whatNWISsites | NWIS site search using user-specified queries
+# - whatNWISdata | NWIS data availability, including period of record and count
+# - readNWISdata | NWIS data using user-specified queries
+
+```
+
+
+```{r AR Graph Theme , echo = FALSE }
 
 theme_ar = function(base_size = 12, base_family = "Avenir") {
   theme_grey(base_size = base_size, base_family = base_family) %+replace%
@@ -104,6 +119,14 @@ theme_ar = function(base_size = 12, base_family = "Avenir") {
     )
 }
 
+```
+
+
+```{huc maps examples, echo = FALSE}
+
+  #https://waterdata.usgs.gov/blog/beyond-basic-mapping/
+  
+  #https://waterdata.usgs.gov/blog/inlmiscmaps/
 
 #View(palettes_c_names)
 #ggsave("your_title.pdf", device=cairo_pdf, width = 6, height = 6)
@@ -117,8 +140,14 @@ theme_ar = function(base_size = 12, base_family = "Avenir") {
 
 sj_available_data <- whatNWISdata(huc = '14080101') #HUC 8 for Upper San Juan 
 
-comment(sj_available_data) 
-#defines all column heading included in teh dataset 
+#comment(sj_available_data) #defines all column heading included in teh dataset 
+
+sj_dis_sites <- sj_available_data %>% 
+  #filter(site_tp_cd == "ST") %>%  #ST for stream
+  filter(parm_cd == "00060") %>% 
+  mutate(Streamflow = "Streamflow") %>% 
+  distinct(site_no, .keep_all = TRUE)
+
 
 #Now if we want to specify search, specify by param in the watershed 
 
@@ -134,8 +163,8 @@ comment(sj_available_data)
 #dis_codes <- parameterCdFile[grep("discharge", parameterCdFile$parameter_nm, ignore.case = TRUE),] 
 #pulling all params that have to do with discharge
 
-nrow(dis_codes) #There are 24 different params for discharge
-unique(dis_codes$parameter_units) #what are the units? 
+#nrow(dis_codes) #There are 24 different params for discharge
+#unique(dis_codes$parameter_units) #what are the units? 
 
 ```
 
@@ -208,6 +237,101 @@ head(sjp_dis_join)
 
 ```
 
+```{r Upper San Juan USGS MAP, echo = FALSE }
+
+#can I load all huc8s? 
+huc8<- read_sf(dsn = here::here("HUC8_US.shp"),
+                 layer = "HUC8_US") %>% 
+              st_transform(crs = 4326) %>% 
+#plot(huc8)
+
+
+#checking out USJ huc 8
+USJ_HUC8<- read_sf(dsn = here::here("HUC8_US.shp"),
+                 layer = "HUC8_US") %>% 
+              st_transform(crs = 4326) %>% 
+  filter(HUC8 == 14080101)
+#plot(usj_huc8)
+
+#NM and CO .shp files
+State <- us_states(resolution = "high", states = NULL) %>%  
+  st_transform(crs = 4326) #%>% 
+  #filter(stusps == "CO" |
+           #stusps == "NM")
+
+
+#All discharge sites into .shp
+USJ_Discharge_Sites <- st_as_sf(sj_dis_sites, 
+                                coords = c("dec_long_va",
+                                           "dec_lat_va"), 
+                                crs = 4326)
+
+# nm_shp <- us_states(resolution = "high", states = "NM") %>%  
+#   st_transform(crs = 4326)
+# 
+# co_nm <- rbind(co_shp, nm_shp)
+
+
+
+tmap_mode("view") #Set so the map will be interactive. 
+
+usj_huc8_map <- tm_basemap("Esri.WorldImagery") + #Add a basemap explored previously in mapview.
+  tm_shape(State) +
+  tm_borders("white") +
+  tm_fill(fill = NA,
+          alpha = 0,
+          id = "name") +
+  tm_shape(USJ_HUC8) +
+  tm_fill("NAME",
+          legend.show = FALSE,
+          alpha = 0.5,
+          id = "NAME") +
+  tm_layout("Upper San Juan Streamflow Stations")+
+  tm_shape(USJ_Discharge_Sites)+
+  tm_dots(labels = "site_no",
+          col = "white",
+          id = "discharge") +
+  
+
+
+usj_huc8_map
+
+
+# usj_huc8_map <- tm_basemap("Esri.WorldImagery") + #Add a basemap explored previously in mapview.
+# tm_shape(usj_huc8) +
+#   tm_lines(col = "Name",
+#            title.col = "Stream Type",
+#            style = "pretty",
+#            palette = "Greens",
+#            id = "Stream",
+#            popup.var = FALSE) +
+# tm_shape(usj_usgs_dis_sites) +
+#   tm_lines(col = "CONTOUR",
+#            title.col="Rain Contour (mm)",
+#            style = "pretty",
+#            palette = "Blues",
+#            id = "Contour",
+#            popup.var = TRUE,
+#            colorNA = NULL) +
+#   tm_layout("Hawaiian Island Hyrdological Dynamics (WGS84)")
+
+```
+
+```{usp map}
+
+
+sjp_map <- leaflet(data=sjp_dis_join) %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  addCircleMarkers(~longitude,~latitude,
+                   color = "red", radius=3, stroke=FALSE,
+                   fillOpacity = 0.8, opacity = 0.8,
+                   popup=~station_nm)
+
+sjp_map
+```
+
+
+
 ```{r Upper San Juan USGS GRAPH, echo = FALSE}
 
 #Basic graph to get a sense for things: 
@@ -274,16 +398,10 @@ sjp_subseries
 
 
 ```{r Upper San Juan USGS PULL ALL GUAGE, echo = FALSE }
-sj_dis_sites <- 
-```
 
-```{r Upper San Juan USGS GRAPH, echo = FALSE }
 
 ```
 
-```{r Upper San Juan USGS MAP, echo = FALSE }
-
-```
 
 ```{r Upper San Juan SNOTEL PULL, echo = FALSE }
 
