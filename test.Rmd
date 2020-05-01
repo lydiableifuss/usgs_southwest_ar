@@ -1,0 +1,91 @@
+---
+title: "testing"
+author: "Lydia Bleifuss"
+date: "5/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#USGS
+library(dataRetrieval)
+
+#SNOTEL
+library(RNRCS)
+
+#Other 
+library(tidyverse)
+library(ggplot2)
+library(leaflet)
+library(dplyr)
+library(maps)
+library(lubridate)
+library(janitor)
+library(tsibble)
+library(snakecase)
+library(stringr)
+library(paletteer)
+library(feasts)
+library(sf)
+library(ggmap)
+library(tmap)
+library(rgdal)
+library(here)
+library(kableExtra)
+library(inlmisc)
+
+#Spatial Clipping 
+library(USAboundaries) # Download shape files
+library(USAboundariesData)
+```
+
+
+```{r Upper San Juan SNOTEL PULL, echo = FALSE }
+
+sjp_snotel_data <- grabNRCS.elements(site_id = "SNTL:840")
+
+
+meta_snotel <- grabNRCS.meta(ntwrks = "SNTL", cnvrt.elev = FALSE)
+
+
+meta_snotel_df_convert <- as.data.frame(meta_snotel[['SNTL']]) 
+
+```
+
+```{r}
+
+meta_snotel_df <- meta_snotel_df_convert %>% 
+  select(-ts, -ntwk, -wyear) %>% 
+  rename(State = state, Site = site_name, Start_Date = start, End_Date = enddate, lat = latitude, long = longitude, Elevation_ft = elev_ft, County = county, HUC = huc, Site_ID = site_id) %>% 
+  filter(Site_ID == "SNTL:840")
+
+```
+
+```{r}
+
+
+
+  snotel_usj_shp <- meta_snotel_df %>% 
+  st_as_sf(coords=c("long",
+                    "lat"), 
+           crs=4326)
+  
+  
+```
+
+
+```{r Upper San Juan TMAP, echo = FALSE }
+
+
+tmap_mode("view") #Set so the map will be interactive.
+
+usj_huc8_map_test <- tm_basemap("Esri.WorldImagery") + #Add a basemap explored previously in mapview.
+  tm_shape(snotel_usj_shp) +
+  tm_dots(col = "skyblue2",
+          size = 0.2) +
+  tm_minimap(toggle = T)
+
+usj_huc8_map_test
+
+```

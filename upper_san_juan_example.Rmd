@@ -106,7 +106,7 @@ theme_ar = function(base_size = 12, base_family = "Avenir") {
       panel.border = element_rect(fill = NA, color = NA),  
       panel.grid.major = element_line(color = NA),  
       panel.grid.minor = element_line(color = NA),  
-      panel.margin = unit(0, "lines"),   
+      panel.spacing = unit(0, "lines"),   
       
       # Specify facetting options
       strip.background = element_rect(fill = "grey30", color = "grey10"),  
@@ -133,7 +133,6 @@ theme_ar = function(base_size = 12, base_family = "Avenir") {
 #View(palettes_c_names)
 #ggsave("your_title.pdf", device=cairo_pdf, width = 6, height = 6)
 ```
-
 
 
 ```{r Upper San Juan USGS AVAILABLE, echo = FALSE }
@@ -334,7 +333,7 @@ meta_snotel <- grabNRCS.meta(ntwrks = "SNTL", cnvrt.elev = FALSE)
 
 meta_snotel_df <- as.data.frame(meta_snotel[['SNTL']]) %>% 
   select(-ts, -ntwk, -wyear) %>% 
-  rename(State = state, Site = site_name, Start_Date = start, End_Date = enddate, Latitude = latitude, Longitude = longitude, Elevation_ft = elev_ft, County = county, HUC = huc, Site_ID = site_id) %>% 
+  rename(State = state, Site = site_name, Start_Date = start, End_Date = enddate, Lat = latitude, Long = longitude, Elevation_ft = elev_ft, County = county, HUC = huc, Site_ID = site_id) %>% 
   filter(Site_ID == "SNTL:840")
 
 
@@ -429,14 +428,14 @@ USJ_Pagosa_Springs <- st_as_sf(sjp_site,
    mutate(Gauge_Type = "Streamflow")
 
 
-#All Snotel Sites
-snotel_shp <- st_as_sf(meta_snotel_df, 
-                                coords = c("Longitude",
-                                           "Latitude"), 
-                                crs = 4326) 
-
-#Snotel in USJ (840)
-USJ_Snotel <- st_intersection(snotel_shp, USJ_HUC8)
+# #All Snotel Sites
+# snotel_shp <- st_as_sf(meta_snotel_df, 
+#                                 coords = c("Long",
+#                                            "Lat"), 
+#                                 crs = 4326) 
+# 
+# #Snotel in USJ (840)
+# USJ_Snotel <- st_intersection(snotel_shp, USJ_HUC8)
 
 
 ```
@@ -444,8 +443,7 @@ USJ_Snotel <- st_intersection(snotel_shp, USJ_HUC8)
   
 ```{r Upper San Juan TMAP, echo = FALSE }
 
-
-tmap_mode("view") #Set so the map will be interactive. 
+tmap_mode("view") #Set so the map will be interactive.
 
 usj_huc8_map <- tm_basemap("Esri.WorldImagery") + #Add a basemap explored previously in mapview.
     tm_layout("Upper San Juan Streamflow Stations") +
@@ -461,22 +459,28 @@ usj_huc8_map <- tm_basemap("Esri.WorldImagery") + #Add a basemap explored previo
           alpha = 0,
           id = "name") +
   tm_shape(USJ_Discharge_Sites)+
-  tm_markers(shape = marker_icon(),
+  tm_markers(shape = marker_icon(options = markerOptions(pane="overlay03")),
              markers.on.top.of.text = TRUE,
              text.just = "top") +
   tm_shape(USJ_Pagosa_Springs)+
   tm_dots(col = "grey",
           size = 0.2) +
-  tm_shape(USJ_Snotel) +
-  tm_dots(col = "skyblue2",
-          size = 0.2) +
   tm_minimap(toggle = T)
-  
+
 usj_huc8_map
 
 ```
 
-```{r Upper San Juan CSV Export}
+```{r }
 
+library(leaflet)
+
+data(USJ_Dicharge_Sites)
+leaflet() %>% 
+	addTiles() %>% 
+	addMapPane("overlay03", zIndex = 403) %>% 
+	addMarkers(data = USJ_Discharge_Sites,
+			   icon = list(), 
+			   options = markerOptions(pane="overlay03"))
 ```
 
