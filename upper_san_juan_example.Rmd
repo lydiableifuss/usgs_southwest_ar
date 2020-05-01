@@ -182,8 +182,8 @@ kable_sj <- kable(head(kable_usj_sites, 10)) %>%
                                       position = "float_right",
                                       font_size = 10,
                                       fixed_thead = T)) %>% 
-  column_spec(1, , width = "20em", bold = T, border_right = T) %>% 
-  pack_rows("Upper San Juan", 1, 5, label_row_css = "background-color: #666; color: #fff;") %>% 
+  column_spec(1,width = "20em", bold = T, border_right = T) %>% 
+  pack_rows("Upper San Juan", 1, 10, label_row_css = "background-color: #666; color: #fff;") %>% 
   scroll_box(width = "600px", height = "300px") %>% 
   footnote(general = "Here is an example of the type of dataframe we can pull from USGS and then either use for analysis/graphing/mapping in R, or export into an Excel document. We could also put together summary statistics in a talbe like this for streamflow, snowpack, etc., perhaps to accompany a graph or map.")
 
@@ -340,35 +340,44 @@ meta_snotel_df <- as.data.frame(meta_snotel[['SNTL']]) %>%
 
 sjp_snotel <- grabNRCS.data(network = "SNTL", 
                             site_id = 840, 
-                            timescale = "monthly", 
+                            timescale = "daily", 
                             DayBgn = "2009-10-01", 
                             DayEnd = "2019-09-30") %>% 
-  select(Date, Snow.Water.Equivalent..in..Start.of.Month.Values) %>% 
-  rename(Snow_Water_Equivalent = Snow.Water.Equivalent..in..Start.of.Month.Values)
+  select(Date, Snow.Water.Equivalent..in..Start.of.Day.Values) %>% 
+  rename(Snow_Water_Equivalent = Snow.Water.Equivalent..in..Start.of.Day.Values) %>% 
+  mutate(date = as.Date.character(Date)) 
+
+sjp_snotel_clean <- sjp_snotel %>%  
+mutate(year_month = yearmonth(date)) %>%  
+  mutate(month = month(date)) %>% 
+  group_by(year_month) %>% 
+  mutate(total_month_swe = sum(Snow_Water_Equivalent)) %>% 
+  mutate(total_month_swe = round(total_month_swe, 0)) %>% 
+  distinct(year_month, .keep_all = TRUE)
 
 ```
 
 ```{r Upper San Juan SNOTEL GRAPH, echo = FALSE }
 
+# Coerce to a tsibble:
+sjp_swe_auto <- as_tsibble(sjp_snotel_clean, index = year_month) %>% 
+  tsibble::fill_gaps()
 
-sjp_swe_graph <- ggplot(data = sjp_snotel,
-                        aes(Date, 
-                            Snow_Water_Equivalent)) +
-  geom_line() +
-  theme_ar() +
-  xlab("") +
-  ylab("SWE") +
-  ggtitle("USJ SWE") +
-  # scale_y_continuous(expand = c(0,0)) +
-  # scale_x_date(date_breaks = "1 year",
-  #              date_labels = "%Y",
-  #              expand = expansion()
-  #              ) +
-  labs(caption = "\nAverage monthly streamflow in the Upper San Juan River near Pagosa Springs, CO from 2009 - 2019.")
-  
-  
-sjp_swe_graph
+sjp_swe_seasonal <- sjp_swe_auto %>% 
+  feasts::gg_season(total_month_swe) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_date(date_breaks = "1 month",
+               date_labels = "%b", #codes from abrivs https://rdrr.io/r/base/strptime.html
+               expand = expansion()
+               ) +
+  xlab("\nMonth") +
+  ylab("Total Monthly SWE") +
+  labs(title = "Total Monthly SWE above Pagosa Springs, CO",
+       subtitle = "NCRS SNOTEL Guage 840 (2009 - 2019)\n") +
+  theme(plot.title = element_text(vjust = 0.5)) +
+  theme_ar()
 
+sjp_swe_seasonal
 ```
 
 ```{r Upper San Juan STATS - DECOMP, echo = FALSE }
