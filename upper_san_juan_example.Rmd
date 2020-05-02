@@ -1,13 +1,9 @@
 ---
-title: "Upper San Juan USGS + SNOTEL Data Pull"
+title: "Upper San Juan USGS Streamflow + SNOTEL Data Pull"
 author: "Lydia Bleifuss"
 date: "4/27/2020"
 output: html_document
 ---
-
- <font size="1"> This is my text number1</font> 
-
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
@@ -181,6 +177,7 @@ kable_sj <- kable(head(kable_usj_sites, 10)) %>%
   kable_styling(bootstrap_options = c("striped", 
                                       "hover",
                                       "condensed",
+                                      "bordered",
                                       "responsive",
                                       full_widge = F,
                                       position = "left",
@@ -190,7 +187,7 @@ kable_sj <- kable(head(kable_usj_sites, 10)) %>%
   column_spec(1,width = "20em", bold = T, border_right = T) %>% 
   pack_rows("Upper San Juan Streamflow Gauges (10)", 1, 10, label_row_css = "background-color: #666; color: #fff;") %>% 
   scroll_box(width = "600px", height = "300px") %>% 
-  footnote(general = "Here is an example of the type of dataframe we can pull from USGS and then either use for analysis/graphing/mapping in R, or export into an Excel document. We could also put together summary statistics in a talbe like this for streamflow, snowpack, etc., perhaps to accompany a graph or map.")
+  footnote(general = "Here is an example of information we can pull from USGS and then either use for analysis/graphing/mapping in R, or export into an Excel document. We could also put together summary statistics in a talbe like this for streamflow, snowpack, etc.")
 
 kable_sj
 
@@ -277,14 +274,14 @@ sjp_dis_graph <- ggplot(data = sjp_dis_join,
   theme_ar() +
   xlab("") +
   ylab("Streamflow (cfs)") +
-  ggtitle(sjp_site$station_nm) +
+  ggtitle("San Juan River at Pagosa Springs, CO") +
   scale_y_continuous(expand = c(0,0)) +
   scale_x_date(date_breaks = "1 year",
                date_labels = "%Y",
                expand = expansion()
                ) +
     gghighlight::gghighlight(year %in% 2018) +
-  labs(caption = "\nAverage monthly streamflow in the Upper San Juan River near Pagosa Springs, CO from 2009 - 2019.")
+  labs(caption = "\nAverage monthly streamflow in the Upper San Juan River near Pagosa Springs, CO from 2009 - 2019.\nFor the purposes of this example, 2018 is highlighted as a drought year.")
   
   
 sjp_dis_graph
@@ -306,7 +303,7 @@ sjp_seasonal <- sjp_auto %>%
                ) +
   xlab("\nMonth") +
   ylab("Average Monthly Streamflow (cfs)") +
-  labs(title = "Seasonal Streamflow at Upper San Juan",
+  labs(title = "Upper San Juan Seasonal Streamflow",
        subtitle = "USGS Guage at Pagosa Springs, CO (2009 - 2019)\n") +
   theme(plot.title = element_text(vjust = 0.5)) +
   theme_ar()
@@ -321,7 +318,7 @@ sjp_subseries <- sjp_auto %>% #Great graphical exploration, provides mean for ea
   feasts::gg_subseries(average_month_dis) +
   xlab("\nMonth") +
   ylab("Average Streamflow (cfs)\n") +
-  ggtitle("Average Streamflow Across all Years (2009 - 2019)\n") +
+  ggtitle("Average Streamflow Across all Years (2009 - 2019)\nUSGA Gauge, Pagosa Springs, CO\n") +
   theme(plot.title = element_text(hjust = 0.5),
         axis.ticks.x = element_blank(),
         panel.grid = element_blank())+
@@ -331,7 +328,7 @@ sjp_subseries <- sjp_auto %>% #Great graphical exploration, provides mean for ea
 sjp_subseries
 ```
 
-
+**I pulled all SNOTEL sites using a NRCS R package. We can pull data from and map any of these gauges.**
 ```{r Upper San Juan SNOTEL PULL, echo = FALSE }
 
 sjp_snotel_data <- grabNRCS.elements(site_id = "SNTL:840")
@@ -346,7 +343,7 @@ meta_snotel_df <- as.data.frame(meta_snotel[['SNTL']]) %>%
   arrange(-desc(State))
 
 
-kable_snotel <- kable(head(meta_snotel_df,20)) %>% 
+kable_snotel <- kable(meta_snotel_df) %>% 
  kable_styling(bootstrap_options = c("striped", 
                                      "bordered",
                                       "hover",
@@ -492,7 +489,7 @@ USJ_Pagosa_Springs <- st_as_sf(sjp_site,
 
 ```
   
-  
+**A quick map with the Upper San Juan HUC 8, the USGS Streamflow gauge at Pagosa Springs (grey) and all other USGS streamflow gauges in the Upper San Juan (blue). You can click on the gauge dots for more information.**
 ```{r Upper San Juan TMAP, echo = FALSE }
 
 tmap_mode("view") #Set so the map will be interactive.
