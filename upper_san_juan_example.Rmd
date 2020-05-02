@@ -5,6 +5,10 @@ date: "4/27/2020"
 output: html_document
 ---
 
+ <font size="1"> This is my text number1</font> 
+
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE,
@@ -38,6 +42,8 @@ library(rgdal)
 library(here)
 library(kableExtra)
 library(inlmisc)
+library(ggrepel)
+library(gghighlight)
 
 #Spatial Clipping 
 library(USAboundaries) # Download shape files
@@ -182,7 +188,7 @@ kable_sj <- kable(head(kable_usj_sites, 10)) %>%
                                       font_size = 10,
                                       fixed_thead = T)) %>% 
   column_spec(1,width = "20em", bold = T, border_right = T) %>% 
-  pack_rows("Upper San Juan", 1, 10, label_row_css = "background-color: #666; color: #fff;") %>% 
+  pack_rows("Upper San Juan Streamflow Gauges (10)", 1, 10, label_row_css = "background-color: #666; color: #fff;") %>% 
   scroll_box(width = "600px", height = "300px") %>% 
   footnote(general = "Here is an example of the type of dataframe we can pull from USGS and then either use for analysis/graphing/mapping in R, or export into an Excel document. We could also put together summary statistics in a talbe like this for streamflow, snowpack, etc., perhaps to accompany a graph or map.")
 
@@ -249,6 +255,8 @@ sjp_dis_join <- full_join(sjp_site, sj_pagosa, by = "site_no") %>%
   mutate(date = as.Date.POSIXct(dateTime)) %>% #need to seperate date from time, so can find average daily cfs, and plot that
   mutate(year_month = yearmonth(date)) %>%  
   mutate(month = month(date)) %>% 
+  mutate(year = year(date)) %>% 
+  mutate(average = mean(Flow_Inst)) %>% 
   group_by(year_month) %>% 
   mutate(average_month_dis = mean(Flow_Inst)) %>% 
   mutate(average_month_dis = round(average_month_dis, 0)) %>% 
@@ -268,13 +276,14 @@ sjp_dis_graph <- ggplot(data = sjp_dis_join,
   geom_line() +
   theme_ar() +
   xlab("") +
-  ylab(sjp_parameter$variableDescription) +
+  ylab("Streamflow (cfs)") +
   ggtitle(sjp_site$station_nm) +
   scale_y_continuous(expand = c(0,0)) +
   scale_x_date(date_breaks = "1 year",
                date_labels = "%Y",
                expand = expansion()
                ) +
+    gghighlight::gghighlight(year %in% 2018) +
   labs(caption = "\nAverage monthly streamflow in the Upper San Juan River near Pagosa Springs, CO from 2009 - 2019.")
   
   
@@ -334,14 +343,33 @@ meta_snotel <- grabNRCS.meta(ntwrks = "SNTL", cnvrt.elev = FALSE)
 meta_snotel_df <- as.data.frame(meta_snotel[['SNTL']]) %>% 
   select(-ts, -ntwk, -wyear) %>% 
   rename(State = state, Site = site_name, Start_Date = start, End_Date = enddate, Lat = latitude, Long = longitude, Elevation_ft = elev_ft, County = county, HUC = huc, Site_ID = site_id) %>% 
-  filter(Site_ID == "SNTL:840")
+  arrange(-desc(State))
 
 
+kable_snotel <- kable(head(meta_snotel_df,20)) %>% 
+ kable_styling(bootstrap_options = c("striped", 
+                                     "bordered",
+                                      "hover",
+                                      "condensed",
+                                      "responsive",
+                                      full_widge = F,
+                                      position = "left",
+                                      position = "float_right",
+                                      font_size = 10,
+                                      fixed_thead = T)) %>% 
+  column_spec(1,20, width = "20em", bold = T, border_right = T) %>% 
+  scroll_box(width = "800px", height = "300px") 
+
+kable_snotel
+
+```
+
+```{r, echo = FALSE}
 sjp_snotel <- grabNRCS.data(network = "SNTL", 
                             site_id = 840, 
                             timescale = "daily", 
                             DayBgn = "2009-10-01", 
-                            DayEnd = "2019-09-30") %>% 
+                            DayEnd = "2020-04-28") %>% 
   select(Date, Snow.Water.Equivalent..in..Start.of.Day.Values) %>% 
   rename(Snow_Water_Equivalent = Snow.Water.Equivalent..in..Start.of.Day.Values) %>% 
   mutate(date = as.Date.character(Date)) 
@@ -349,32 +377,56 @@ sjp_snotel <- grabNRCS.data(network = "SNTL",
 sjp_snotel_clean <- sjp_snotel %>%  
 mutate(year_month = yearmonth(date)) %>%  
   mutate(month = month(date)) %>% 
+  mutate(year = year(date)) %>% 
   group_by(year_month) %>% 
   mutate(total_month_swe = sum(Snow_Water_Equivalent)) %>% 
   mutate(total_month_swe = round(total_month_swe, 0)) %>% 
   distinct(year_month, .keep_all = TRUE)
 
+sjp_snotel_hist <- sjp_snotel_clean %>%
+  filter(year <= 2019)
+
+sjp_snotel_2020 <- sjp_snotel_clean %>%
+  filter(year > 2019)
+
 ```
 
 ```{r Upper San Juan SNOTEL GRAPH, echo = FALSE }
+#View(palettes_c_names)
 
-# Coerce to a tsibble:
-sjp_swe_auto <- as_tsibble(sjp_snotel_clean, index = year_month) %>% 
-  tsibble::fill_gaps()
+df <- data.frame(year = c(2020))
 
-sjp_swe_seasonal <- sjp_swe_auto %>% 
-  feasts::gg_season(total_month_swe) +
-  scale_y_continuous(expand = c(0,0)) +
-  scale_x_date(date_breaks = "1 month",
-               date_labels = "%b", #codes from abrivs https://rdrr.io/r/base/strptime.html
-               expand = expansion()
-               ) +
+
+sjp_swe_seasonal <- ggplot() +
+  geom_line(data = sjp_snotel_hist, 
+            aes(x = month,
+                y = total_month_swe, 
+                group = year, 
+                color = year), 
+            alpha = 0.8, size = 0.8) +
+  geom_line(data = sjp_snotel_2020, 
+            linetype = "dashed", 
+            size = 1, 
+            aes(x = month, 
+                y = total_month_swe))+
+annotate(
+    geom = "curve", x = 8, y = 900, xend = 4.2, yend = 670,
+    curvature = .3, arrow = arrow(length = unit(3, "mm"))
+  ) +
+  annotate(geom = "text", x = 8, y = 900, label = "2020", hjust = "left") +
+  theme_ar()+
+  labs(title = "Total Monthly Snow-Water-Equivalent, Pagosa Springs, CO",
+        subtitle = "NCRS SNOTEL Guage 840 (2009 - 2020)\n")+
   xlab("\nMonth") +
-  ylab("Total Monthly SWE") +
-  labs(title = "Total Monthly SWE above Pagosa Springs, CO",
-       subtitle = "NCRS SNOTEL Guage 840 (2009 - 2019)\n") +
-  theme(plot.title = element_text(vjust = 0.5)) +
-  theme_ar()
+  ylab("Total Monthly SWE (in)\n") +
+  guides(color=guide_legend("Year")) +
+  scale_y_continuous(expand = c(0,0)) +
+ scale_x_discrete(expand = c(0,0), 
+                  limits=c(10,11,12,1,2,3,4,5,6,7,8,9)) +
+  theme(axis.text.x = element_text(angle = 0)) +
+  scale_color_paletteer_c("ggthemes::Temperature Diverging")
+
+
 
 sjp_swe_seasonal
 ```
@@ -459,28 +511,32 @@ usj_huc8_map <- tm_basemap("Esri.WorldImagery") + #Add a basemap explored previo
           alpha = 0,
           id = "name") +
   tm_shape(USJ_Discharge_Sites)+
-  tm_markers(shape = marker_icon(options = markerOptions(pane="overlay03")),
-             markers.on.top.of.text = TRUE,
-             text.just = "top") +
+  tm_dots(col = "cornflowerblue",
+          size = 0.1) +
+  # tm_shape(USJ_Discharge_Sites)+
+  # tm_markers(shape = marker_icon,
+  #            markers.on.top.of.text = TRUE,
+  #            text.just = "top") +
   tm_shape(USJ_Pagosa_Springs)+
   tm_dots(col = "grey",
-          size = 0.2) +
+          size = 0.2,
+          id = "Station_Info") +
   tm_minimap(toggle = T)
 
 usj_huc8_map
 
 ```
 
-```{r }
+```{r, echo = FALSE}
 
-library(leaflet)
-
-data(USJ_Dicharge_Sites)
-leaflet() %>% 
-	addTiles() %>% 
-	addMapPane("overlay03", zIndex = 403) %>% 
-	addMarkers(data = USJ_Discharge_Sites,
-			   icon = list(), 
-			   options = markerOptions(pane="overlay03"))
+# library(leaflet)
+# 
+# data(USJ_Dicharge_Sites)
+# leaflet() %>% 
+# 	addTiles() %>% 
+# 	addMapPane("overlay03", zIndex = 403) %>% 
+# 	addMarkers(data = USJ_Discharge_Sites,
+# 			   icon = list(), 
+# 			   options = markerOptions(pane="overlay03"))
 ```
 
