@@ -1,7 +1,7 @@
 ---
 title: "Upper San Juan USGS Streamflow + SNOTEL Data Pull"
 author: "Lydia Bleifuss"
-date: "4/27/2020"
+date: "5/08/2020"
 output: html_document
 ---
 
@@ -253,7 +253,7 @@ sjp_dis_join <- full_join(sjp_site, sj_pagosa, by = "site_no") %>%
   mutate(year_month = yearmonth(date)) %>%  
   mutate(month = month(date)) %>% 
   mutate(year = year(date)) %>% 
-  mutate(average = mean(Flow_Inst)) %>% 
+  #mutate(average = mean(Flow_Inst)) %>% 
   group_by(year_month) %>% 
   mutate(average_month_dis = mean(Flow_Inst)) %>% 
   mutate(average_month_dis = round(average_month_dis, 0)) %>% 
@@ -366,7 +366,7 @@ sjp_snotel <- grabNRCS.data(network = "SNTL",
                             site_id = 840, 
                             timescale = "daily", 
                             DayBgn = "2009-10-01", 
-                            DayEnd = "2020-04-28") %>% 
+                            DayEnd = "2050-09-30") %>% 
   select(Date, Snow.Water.Equivalent..in..Start.of.Day.Values) %>% 
   rename(Snow_Water_Equivalent = Snow.Water.Equivalent..in..Start.of.Day.Values) %>% 
   mutate(date = as.Date.character(Date)) 
@@ -376,56 +376,140 @@ mutate(year_month = yearmonth(date)) %>%
   mutate(month = month(date)) %>% 
   mutate(year = year(date)) %>% 
   group_by(year_month) %>% 
-  mutate(total_month_swe = sum(Snow_Water_Equivalent)) %>% 
-  mutate(total_month_swe = round(total_month_swe, 0)) %>% 
+  mutate(mean_month_swe = mean(Snow_Water_Equivalent)) %>% 
+ mutate(mean_month_swe = round(mean_month_swe, 0)) %>% 
+   mutate(daily_swe_round = round(Snow_Water_Equivalent, 0)) %>% 
   distinct(year_month, .keep_all = TRUE)
 
-sjp_snotel_hist <- sjp_snotel_clean %>%
-  filter(year <= 2019)
+df_max_point <- sjp_snotel_clean %>% 
+  mutate(group_all = "group_all") %>% 
+  group_by(group_all) %>% 
+  filter(year_month == max(year_month))
 
-sjp_snotel_2020 <- sjp_snotel_clean %>%
-  filter(year > 2019)
+sjp_snotel_hist <- sjp_snotel_clean %>%
+  mutate(group_all = "group_all") %>% 
+  group_by(group_all) %>% 
+  mutate(max_year = max(year)) %>% 
+  filter(year < max_year)
+
+sjp_snotel_hist_max <- sjp_snotel_clean %>%
+  mutate(group_all = "group_all") %>% 
+  group_by(group_all) %>% 
+  mutate(max_year = max(year)) %>% 
+  filter(year >= max_year)
 
 ```
 
 ```{r Upper San Juan SNOTEL GRAPH, echo = FALSE }
-#View(palettes_c_names)
+# #View(palettes_c_names)
+# 
+# #df <- data.frame(year = c(2020))
+# 
+# 
+# sjp_swe_seasonal <- ggplot() +
+#   # geom_line(data = sjp_snotel_hist, 
+#   #           aes(x = month,
+#   #               y = mean_month_swe, 
+#   #               group = year, 
+#   #               color = year), 
+#   #           alpha = 0.8, size = 0.8) +
+#   geom_line(data = sjp_snotel_2020, 
+#             linetype = "dashed", 
+#             size = 1, 
+#             aes(x = month, 
+#                 y = mean_month_swe))+
+# geom_text_repel(
+#     data = subset(sjp_snotel_2020, month == max(month)),
+#     aes(label = paste(year_month)),
+#     size = 6,
+#     nudge_x = 45,
+#     segment.color = NA
+#   )+
+# # annotate(
+# #     geom = "curve", x = 7, y = 15, xend = 5.2, yend = 13.5,
+# #     curvature = .3, arrow = arrow(length = unit(3, "mm"))
+# #   ) +
+# #   annotate(geom = "text", x = 7, y = 15, label = "2020", hjust = "left") +
+# #   theme_ar()+
+#   labs(title = "Average Monthly Snow-Water-Equivalent, Pagosa Springs, CO",
+#         subtitle = "NCRS SNOTEL Guage 840 (2009 - 2020)\n")+
+#   xlab("\nMonth") +
+#   ylab("Average Monthly SWE (in)\n") +
+#   guides(color=guide_legend("Year")) +
+#   scale_y_continuous(expand = c(0,0)) +
+#  scale_x_discrete(expand = c(0,0), 
+#                   limits=c(10,11,12,1,2,3,4,5,6,7,8,9)) +
+#   theme(axis.text.x = element_text(angle = 0)) +
+#   scale_color_paletteer_c("ggthemes::Temperature Diverging")
+# 
+# 
+# 
+# sjp_swe_seasonal
+```
 
-df <- data.frame(year = c(2020))
+```{r Upper San Juan SNOTEL GRAPH TEST, echo = FALSE }
 
-
-sjp_swe_seasonal <- ggplot() +
-  geom_line(data = sjp_snotel_hist, 
-            aes(x = month,
-                y = total_month_swe, 
-                group = year, 
-                color = year), 
-            alpha = 0.8, size = 0.8) +
-  geom_line(data = sjp_snotel_2020, 
-            linetype = "dashed", 
-            size = 1, 
-            aes(x = month, 
-                y = total_month_swe))+
-annotate(
-    geom = "curve", x = 8, y = 900, xend = 4.2, yend = 670,
-    curvature = .3, arrow = arrow(length = unit(3, "mm"))
+sjp_swe_seasonal_test <- ggplot() +
+   geom_line(data = sjp_snotel_hist, 
+             aes(x = month, 
+                 y = mean_month_swe, 
+                 group = year, 
+                 color = year)) +
+   geom_line(data = sjp_snotel_hist_max, 
+             linetype = "dashed", 
+            size = 1,
+             aes(x = month, 
+                 y = mean_month_swe, 
+                 group = year)) +
+  geom_point(data = df_max_point, 
+             aes(x = month, 
+                 y = mean_month_swe)) +
+geom_text_repel(data = df_max_point, 
+                aes(month, mean_month_swe, 
+                    label = year),
+                point.padding = 0.9,
+    nudge_x = 3,
+    nudge_y = 4,
+    segment.curvature = -1e-20,
+    arrow = arrow(length = unit(0.03, "npc"))
   ) +
-  annotate(geom = "text", x = 8, y = 900, label = "2020", hjust = "left") +
-  theme_ar()+
-  labs(title = "Total Monthly Snow-Water-Equivalent, Pagosa Springs, CO",
+  labs(title = "Average Monthly Snow-Water-Equivalent, Pagosa Springs, CO",
         subtitle = "NCRS SNOTEL Guage 840 (2009 - 2020)\n")+
   xlab("\nMonth") +
-  ylab("Total Monthly SWE (in)\n") +
+  ylab("Average Monthly SWE (in)\n") +
   guides(color=guide_legend("Year")) +
   scale_y_continuous(expand = c(0,0)) +
- scale_x_discrete(expand = c(0,0), 
+ scale_x_discrete(expand = c(0,0),
                   limits=c(10,11,12,1,2,3,4,5,6,7,8,9)) +
+  theme_ar() +
   theme(axis.text.x = element_text(angle = 0)) +
   scale_color_paletteer_c("ggthemes::Temperature Diverging")
 
 
+sjp_swe_seasonal_test
 
-sjp_swe_seasonal
+```
+
+
+
+
+```{r, echo = FALSE}
+# set.seed(42)
+# ggplot(Orange, aes(age, circumference, color = Tree)) +
+#   geom_line() +
+#   coord_cartesian(xlim = c(min(Orange$age), max(Orange$age) + 90)) +
+#   geom_text_repel(
+#     data = subset(Orange, age == max(age)),
+#     aes(label = paste("Tree", Tree)),
+#     size = 6,
+#     nudge_x = 45,
+#     segment.color = NA
+#   ) +
+#   theme_classic(base_size = 16) +
+#   theme(legend.position = "none") +
+#   labs(title = "Orange Trees", x = "Age (days)", y = "Circumference (mm)")
+# 
+# #View(Orange)
 ```
 
 ```{r Upper San Juan STATS - DECOMP, echo = FALSE }
@@ -488,6 +572,9 @@ USJ_Pagosa_Springs <- st_as_sf(sjp_site,
 
 
 ```
+  
+  
+  
   
 **A quick map with the Upper San Juan HUC 8, the USGS Streamflow gauge at Pagosa Springs (grey) and all other USGS streamflow gauges in the Upper San Juan (blue). You can click on the gauge dots for more information.**
 ```{r Upper San Juan TMAP, echo = FALSE }
